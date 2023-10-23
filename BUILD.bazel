@@ -1,0 +1,45 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+
+# Rule for checking if GNU Make exists
+genrule(
+    name = "find_gnu_make",
+    outs = ["found_make.txt"],
+    cmd = """
+    for dir in $${PATH//:/ }; do
+      for prog in gmake gnumake make; do
+        if [ -f $$dir/$$prog ] && ($$dir/$$prog -f /dev/null --version 2>/dev/null | grep GNU >/dev/null 2>&1); then
+          echo "Using GNU make found at $$dir/$$prog" > $@
+          exit 0
+        fi
+      done
+    done
+    echo "You must use GNU make to build PostgreSQL." > $@
+    exit 1
+    """,
+)
+
+# Rule for generating a file if configure is missing
+write_file(
+    name = "generate_configure_message",
+    out = "configure_message.txt",
+    content = [
+        "You need to run the 'configure' program first. See the file",
+        "'INSTALL' or 'README.git' for installation instructions, or visit:",
+        "<https://www.postgresql.org/docs/devel/installation.html>",
+    ],
+)
+
+# Rule to check if GNUmakefile exists and run configure if needed
+genrule(
+    name = "check_gnumakefile",
+    outs = ["check_gnumakefile.txt"],
+    cmd = """
+    if [ ! -f $(location //some/path:GNUmakefile) ]; then
+      cat $(location :generate_configure_message) > $@
+      exit 1
+    else
+      echo "GNUmakefile exists." > $@
+    fi
+    """,
+    tools = [":generate_configure_message"],
+)
